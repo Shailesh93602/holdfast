@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { createPool } from "./infra/db";
+import { migrate } from "./infra/migrate";
 import { makeDrizzle } from "./db/client";
 import { inventory } from "./db/schema";
 import { reserve } from "./domain/reservation";
@@ -83,10 +84,18 @@ const sweeper = setInterval(() => {
 sweeper.unref();
 
 const port = Number(process.env.PORT ?? 3000);
-app
-  .listen({ port, host: "0.0.0.0" })
-  .then(() => app.log.info(`QuickCommerce Core on :${port}`))
-  .catch((err) => {
-    app.log.error(err);
-    process.exit(1);
-  });
+
+async function start(): Promise<void> {
+  // Hosted platforms run a fresh container — apply migrations on boot when asked.
+  if (process.env.RUN_MIGRATIONS_ON_BOOT === "true") {
+    app.log.info("applying migrations on boot…");
+    await migrate();
+  }
+  await app.listen({ port, host: "0.0.0.0" });
+  app.log.info(`Holdfast listening on :${port}`);
+}
+
+start().catch((err) => {
+  app.log.error(err);
+  process.exit(1);
+});
