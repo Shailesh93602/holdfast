@@ -15,6 +15,13 @@
       "when": 1781161174797,
       "tag": "0001_magical_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781174054062,
+      "tag": "0002_talented_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

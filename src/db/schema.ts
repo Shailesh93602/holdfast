@@ -7,6 +7,7 @@ import {
   timestamp,
   index,
   check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -63,5 +64,25 @@ export const orders = pgTable(
       sql`${t.status} IN ('HELD','CONFIRMED','RELEASED','FULFILLED')`,
     ),
     index("idx_orders_status_expires").on(t.status, t.expiresAt),
+  ],
+);
+
+/**
+ * Sharded stock for hot SKUs: a SKU's inventory is split across N rows so
+ * concurrent reservations contend on N different row locks instead of one hot
+ * row — the standard fix for single-row write contention. (See domain/sharded.ts.)
+ */
+export const inventoryShards = pgTable(
+  "inventory_shards",
+  {
+    sku: text("sku")
+      .notNull()
+      .references(() => products.sku),
+    shard: integer("shard").notNull(),
+    available: integer("available").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sku, t.shard] }),
+    check("inventory_shards_available_nonneg", sql`${t.available} >= 0`),
   ],
 );

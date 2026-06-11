@@ -63,6 +63,19 @@ held_orders = winners            // exactly one order per winner
 
 ---
 
+## Scaling a hot SKU (sharded stock)
+
+A single inventory row is a single lock — the ceiling on a viral SKU. The fix is to **split that SKU's stock across N shard rows**; a reservation hits a random shard (falling back through the rest), so concurrent buyers contend on N locks instead of one. Same total demand, spread out:
+
+| shards | throughput (res/s) | vs 1 shard |
+|---|---|---|
+| 1 | ~14,000 | 1.00× |
+| 4 | ~27,000 | 1.9× |
+| 16 | ~49,000 | 3.5× |
+| 64 | ~49,000 | 3.5× (plateau — pool/CPU bound) |
+
+Aggregate correctness is unchanged (`test/sharded.test.ts`): total stock = sum of shards, fallback ensures every unit still sells, and no shard can go negative. Diminishing returns past ~16 shards on this machine — the honest shape of the curve. (`npm run bench:sharded`; `src/domain/sharded.ts`.)
+
 ## Idempotency (money-movement discipline)
 
 Order placement accepts an `Idempotency-Key`. The `orders.idempotency_key` UNIQUE constraint makes a retried/duplicated request collide instead of reserving twice. The whole thing is one transaction, so a key that loses the race **rolls back its decrement** — net effect: exactly one reservation per key (verified with 100 concurrent identical requests).

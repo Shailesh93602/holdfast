@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "tsx src/bench.ts",
+    "bench:sharded": "tsx src/sharded-bench.ts",
     "typecheck": "tsc --noEmit",
     "loadtest": "k6 run loadtest/k6-reserve.js"
   },
