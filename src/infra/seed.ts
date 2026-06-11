@@ -22,15 +22,37 @@ export async function setStock(
   );
 }
 
-// `npm run seed` — a tiny demo catalog.
+/** Demo catalog. LOADTEST has huge stock so load demos don't deplete real SKUs. */
+export const DEMO_CATALOG: Array<[string, number]> = [
+  ["MILK-1L", 100],
+  ["EGGS-12", 50],
+  ["BREAD-400G", 25],
+  ["LOADTEST", 1_000_000],
+];
+
+export async function seedDemoCatalog(pool: Pool): Promise<void> {
+  for (const [sku, qty] of DEMO_CATALOG) await setStock(pool, sku, qty);
+}
+
+/**
+ * Seed the demo catalog only if it's empty. Lets hosted deploys self-seed on
+ * first boot (no shell needed) without clobbering data on every restart.
+ * Returns true if it seeded.
+ */
+export async function seedDemoIfEmpty(pool: Pool): Promise<boolean> {
+  const r = await pool.query<{ c: number }>(
+    `SELECT count(*)::int AS c FROM products`,
+  );
+  if ((r.rows[0]?.c ?? 0) > 0) return false;
+  await seedDemoCatalog(pool);
+  return true;
+}
+
+// `npm run seed` — force-seed the demo catalog.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const pool = createPool({ max: 2 });
-  Promise.all([
-    setStock(pool, "MILK-1L", 100),
-    setStock(pool, "EGGS-12", 50),
-    setStock(pool, "BREAD-400G", 25),
-  ])
-    .then(() => console.log("✓ seeded demo SKUs: MILK-1L, EGGS-12, BREAD-400G"))
+  seedDemoCatalog(pool)
+    .then(() => console.log(`✓ seeded: ${DEMO_CATALOG.map(([s]) => s).join(", ")}`))
     .catch((e) => {
       console.error(e);
       process.exit(1);

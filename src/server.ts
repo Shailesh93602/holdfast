@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { createPool } from "./infra/db";
 import { migrate } from "./infra/migrate";
+import { seedDemoIfEmpty } from "./infra/seed";
 import { makeDrizzle } from "./db/client";
 import { inventory } from "./db/schema";
 import { reserve } from "./domain/reservation";
@@ -113,6 +114,11 @@ async function start(): Promise<void> {
   if (process.env.RUN_MIGRATIONS_ON_BOOT === "true") {
     app.log.info("applying migrations on boot…");
     await migrate();
+  }
+  // Self-seed the demo catalog on first boot (no shell needed). Idempotent.
+  if (process.env.SEED_ON_BOOT === "true") {
+    const seeded = await seedDemoIfEmpty(pool);
+    app.log.info(seeded ? "seeded demo catalog" : "catalog already present");
   }
   await app.listen({ port, host: "0.0.0.0" });
   app.log.info(`Holdfast listening on :${port}`);
