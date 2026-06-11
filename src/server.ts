@@ -6,6 +6,7 @@ import { migrate } from "./infra/migrate";
 import { makeDrizzle } from "./db/client";
 import { inventory } from "./db/schema";
 import { reserve } from "./domain/reservation";
+import { reserveBasket } from "./domain/basket";
 import { confirmOrder, sweepExpired } from "./domain/lifecycle";
 import {
   registry,
@@ -19,9 +20,23 @@ const pool = createPool();
 const db = makeDrizzle(pool);
 const app = Fastify({ logger: true });
 
+/** Map a reservation failure to an HTTP status. */
+function failureCode(reason: string): number {
+  if (reason === "NOT_FOUND") return 404;
+  if (reason === "INSUFFICIENT_STOCK") return 409;
+  return 503; // RETRY_EXHAUSTED
+}
+
 const reserveBody = z.object({
   sku: z.string().min(1),
   qty: z.number().int().positive().default(1),
+  strategy: z.enum(STRATEGIES).optional(),
+});
+
+const basketBody = z.object({
+  items: z
+    .array(z.object({ sku: z.string().min(1), qty: z.number().int().positive() }))
+    .min(1),
   strategy: z.enum(STRATEGIES).optional(),
 });
 
@@ -44,15 +59,23 @@ app.post("/reserve", async (req, reply) => {
   }
 
   if (!result.ok) {
-    const code =
-      result.reason === "NOT_FOUND"
-        ? 404
-        : result.reason === "INSUFFICIENT_STOCK"
-          ? 409
-          : 503;
-    return reply.code(code).send(result);
+    return reply.code(failureCode(result.reason)).send(result);
   }
   return reply.code(result.deduped ? 200 : 201).send(result);
+});
+
+app.post("/reserve-basket", async (req, reply) => {
+  const parsed = basketBody.safeParse(req.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.flatten() });
+  }
+  const result = await reserveBasket(pool, parsed.data.items, {
+    strategy: parsed.data.strategy,
+  });
+  if (!result.ok) {
+    return reply.code(failureCode(result.reason)).send(result);
+  }
+  return reply.code(201).send(result);
 });
 
 app.post<{ Params: { id: string } }>("/orders/:id/confirm", async (req, reply) => {

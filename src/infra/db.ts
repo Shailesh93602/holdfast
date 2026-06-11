@@ -1,7 +1,7 @@
 import { Pool, type PoolConfig } from "pg";
 
 export const CONNECTION_STRING =
-  process.env.DATABASE_URL ?? "postgresql://localhost:5432/quickcommerce";
+  process.env.DATABASE_URL ?? "postgresql://localhost:5432/holdfast";
 
 /**
  * Create a connection pool. `max` matters for the concurrency tests/benchmarks:

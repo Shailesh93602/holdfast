@@ -6,6 +6,6 @@ export default defineConfig({
   out: "./drizzle",
   dbCredentials: {
     url:
-      process.env.DATABASE_URL ?? "postgresql://localhost:5432/quickcommerce",
+      process.env.DATABASE_URL ?? "postgresql://localhost:5432/holdfast",
   },
 });

@@ -44,6 +44,8 @@ export const orders = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     // UNIQUE makes placement idempotent: a retry collides instead of re-reserving.
     idempotencyKey: text("idempotency_key").unique(),
+    // Groups the line-item orders created by a single multi-SKU basket.
+    basketId: uuid("basket_id"),
     sku: text("sku")
       .notNull()
       .references(() => products.sku),

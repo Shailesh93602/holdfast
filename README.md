@@ -67,6 +67,12 @@ held_orders = winners            // exactly one order per winner
 
 Order placement accepts an `Idempotency-Key`. The `orders.idempotency_key` UNIQUE constraint makes a retried/duplicated request collide instead of reserving twice. The whole thing is one transaction, so a key that loses the race **rolls back its decrement** — net effect: exactly one reservation per key (verified with 100 concurrent identical requests).
 
+## Multi-item baskets (deadlock-safe)
+
+Real carts reserve several SKUs at once, atomically. The trap: if cart A reserves `[milk, eggs]` while cart B reserves `[eggs, milk]` concurrently, naive per-item locking **deadlocks** (A holds milk waiting eggs; B holds eggs waiting milk — Postgres aborts one). `reserveBasket` prevents it by acquiring rows in a single **global order (sorted by SKU)**, so every concurrent basket grabs shared SKUs in the same sequence and no lock cycle can form. All-or-nothing: any out-of-stock line rolls the whole basket back.
+
+Proven in `test/basket.test.ts`: **100 concurrent baskets locking the same two SKUs in opposite order complete with zero deadlocks** and a consistent ledger.
+
 ## Reservation lifecycle
 
 ```
@@ -85,8 +91,8 @@ A background sweeper (`FOR UPDATE SKIP LOCKED`) returns abandoned holds to stock
 
 ```bash
 # 1. Postgres (local or docker compose up -d)
-createdb quickcommerce
-export DATABASE_URL=postgresql://localhost:5432/quickcommerce
+createdb holdfast
+export DATABASE_URL=postgresql://localhost:5432/holdfast
 
 npm install
 npm run migrate
@@ -102,6 +108,7 @@ curl -XPOST localhost:3000/reserve -H 'idempotency-key: a1' \
 | Method | Path | |
 |---|---|---|
 | POST | `/reserve` | `{sku, qty, strategy?}` + optional `Idempotency-Key` header → 201/200/409/404 |
+| POST | `/reserve-basket` | `{items:[{sku,qty}], strategy?}` — atomic, deadlock-safe multi-SKU |
 | POST | `/orders/:id/confirm` | HELD → CONFIRMED |
 | GET | `/inventory/:sku` | available / reserved / version |
 | GET | `/metrics` | Prometheus |
