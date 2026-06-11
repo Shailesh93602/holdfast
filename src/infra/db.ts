@@ -9,9 +9,16 @@ export const CONNECTION_STRING =
  * requests queued behind a tiny pool.
  */
 export function createPool(overrides: PoolConfig = {}): Pool {
-  return new Pool({
+  const pool = new Pool({
     connectionString: CONNECTION_STRING,
     max: Number(process.env.PG_POOL_MAX ?? 24),
     ...overrides,
   });
+  // A dropped backend (failover / kill mid-transaction) must not crash the
+  // process. The in-flight query already rejects to its caller; these handlers
+  // just swallow the connection-teardown signal. Attached once per physical
+  // client (via 'connect'), not per checkout, to avoid listener accumulation.
+  pool.on("error", () => {});
+  pool.on("connect", (client) => client.on("error", () => {}));
+  return pool;
 }

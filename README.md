@@ -82,6 +82,10 @@ HOLD (TTL 2m) ──confirm──▶ CONFIRMED
 ```
 A background sweeper (`FOR UPDATE SKIP LOCKED`) returns abandoned holds to stock.
 
+## Resilience — fails closed under chaos
+
+`test/chaos.test.ts` runs a stampede of 400 buyers while a concurrent killer issues `pg_terminate_backend` on their connections, **violently aborting ~100 transactions mid-flight**. The guarantee holds anyway: killed transactions roll back, so they leave no phantom decrements — **exactly the available stock sells, `available` never goes negative, and the ledger stays consistent** every run. The pool swallows backend-teardown signals (failover/kill) so a dropped connection can never crash the process.
+
 ## Observability
 `/metrics` exposes `qc_reservations_total{strategy,result}`, `qc_reservation_duration_seconds`, and `qc_optimistic_cas_attempts` for Prometheus/Grafana.
 
