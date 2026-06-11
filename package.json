@@ -1,12 +1,13 @@
 {
-  "name": "quickcommerce-core",
+  "name": "holdfast",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Inventory reservation engine that never oversells under concurrency. Benchmarks pessimistic-lock vs optimistic-CAS vs atomic-conditional strategies against real Postgres.",
+  "description": "Holdfast — an inventory reservation engine that never oversells under concurrency. Benchmarks pessimistic-lock vs optimistic-CAS vs atomic-conditional strategies against real Postgres.",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "db:generate": "drizzle-kit generate",
     "migrate": "tsx src/infra/migrate.ts",
     "seed": "tsx src/infra/seed.ts",
     "test": "vitest run",
@@ -16,6 +17,7 @@
     "loadtest": "k6 run loadtest/k6-reserve.js"
   },
   "dependencies": {
+    "drizzle-orm": "^0.38.3",
     "fastify": "^5.2.0",
     "pg": "^8.13.1",
     "prom-client": "^15.1.3",
@@ -24,6 +26,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.30.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

@@ -1,4 +1,7 @@
 import type { Pool } from "pg";
+import { eq } from "drizzle-orm";
+import { makeDrizzle } from "../src/db/client";
+import { inventory } from "../src/db/schema";
 
 /** Reset a SKU to a known stock level and clear its orders — test isolation. */
 export async function resetSku(
@@ -25,11 +28,12 @@ export async function inventoryOf(
   pool: Pool,
   sku: string,
 ): Promise<{ available: number; reserved: number }> {
-  const r = await pool.query<{ available: number; reserved: number }>(
-    `SELECT available, reserved FROM inventory WHERE sku = $1`,
-    [sku],
-  );
-  return r.rows[0]!;
+  const db = makeDrizzle(pool);
+  const rows = await db
+    .select({ available: inventory.available, reserved: inventory.reserved })
+    .from(inventory)
+    .where(eq(inventory.sku, sku));
+  return rows[0]!;
 }
 
 export async function heldOrderCount(pool: Pool, sku: string): Promise<number> {

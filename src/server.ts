@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { createPool } from "./infra/db";
+import { makeDrizzle } from "./db/client";
+import { inventory } from "./db/schema";
 import { reserve } from "./domain/reservation";
 import { confirmOrder, sweepExpired } from "./domain/lifecycle";
 import {
@@ -12,6 +15,7 @@ import {
 import { STRATEGIES } from "./domain/types";
 
 const pool = createPool();
+const db = makeDrizzle(pool);
 const app = Fastify({ logger: true });
 
 const reserveBody = z.object({
@@ -56,12 +60,12 @@ app.post<{ Params: { id: string } }>("/orders/:id/confirm", async (req, reply) =
 });
 
 app.get<{ Params: { sku: string } }>("/inventory/:sku", async (req, reply) => {
-  const r = await pool.query(
-    `SELECT sku, available, reserved, version FROM inventory WHERE sku = $1`,
-    [req.params.sku],
-  );
-  if (r.rowCount === 0) return reply.code(404).send({ error: "not found" });
-  return r.rows[0];
+  const rows = await db
+    .select()
+    .from(inventory)
+    .where(eq(inventory.sku, req.params.sku));
+  if (rows.length === 0) return reply.code(404).send({ error: "not found" });
+  return rows[0];
 });
 
 app.get("/healthz", async () => ({ ok: true }));

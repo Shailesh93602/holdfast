@@ -1,4 +1,6 @@
-# QuickCommerce Core
+# Holdfast
+
+> *hold·fast* — a firm grip that won't let go.
 
 An inventory-reservation engine that **never oversells under concurrency** — the hardest correctness problem in quick-commerce (Zepto / Blinkit / Instamart). It implements and **benchmarks three concurrency-control strategies** against real Postgres, with idempotent order placement, a reservation lifecycle, and Prometheus observability.
 
@@ -53,9 +55,9 @@ held_orders = winners            // exactly one order per winner
 
 | strategy | throughput (res/s) | latency (ms) | avg CAS attempts/win |
 |---|---|---|---|
-| atomic | ~3,300 | ~610 | 1.00 |
-| pessimistic | ~3,700 | ~540 | 1.00 |
-| optimistic | ~3,000 | ~670 | **2.00** |
+| atomic | ~4,200 | ~475 | 1.00 |
+| pessimistic | ~4,300 | ~465 | 1.00 |
+| optimistic | ~3,400 | ~580 | **2.00** |
 
 **Reading the result:** when every request hammers the *same* row, pessimistic and atomic serialize efficiently; optimistic loses because it averages 2 CAS attempts per win (it retries the lost races). Optimistic's advantage shows up when contention is *spread across many rows* — the inverse workload. *(Numbers are a single-machine local benchmark; rerun on your hardware.)*
 
@@ -110,5 +112,8 @@ curl -XPOST localhost:3000/reserve -H 'idempotency-key: a1' \
 ## Deliberately out of scope (honesty)
 Payments (see my `stripe-payments-demo` / `razorpay-patterns-demo`), delivery routing, real auth, and a UI. This is the reservation *core*, kept sharp.
 
+## Schema & migrations
+Schema is **model-driven**: defined as code in [`src/db/schema.ts`](src/db/schema.ts) and migrations are **generated** from it via Drizzle (`npm run db:generate`) — no hand-written DDL. Ordinary reads go through Drizzle's type-safe query builder. The reservation hot path deliberately drops to **raw SQL** (`src/domain/strategies.ts`) because the whole value is in the explicit `FOR UPDATE` / conditional-update / version-CAS locking — which an ORM's query builder would hide and whose interactive transactions add overhead under heavy contention. ORM for productivity, raw SQL where it counts.
+
 ## Stack
-TypeScript (strict) · Postgres 16 (raw SQL via `node-postgres` — chosen over an ORM precisely to make the locking/isolation explicit) · Fastify · Zod · prom-client · Vitest.
+TypeScript (strict) · Postgres 16 · **Drizzle** (schema-as-code + generated migrations + typed reads) · raw SQL via `node-postgres` on the lock path · Fastify · Zod · prom-client · Vitest.
